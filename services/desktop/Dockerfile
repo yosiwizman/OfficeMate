@@ -19,18 +19,68 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
   && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y code || true
 
 # Nginx base config to include our conf.d files
-RUN sh -lc "cat > /etc/nginx/nginx.conf << 'EOF'\nuser www-data;\nworker_processes auto;\nerror_log /var/log/nginx/error.log warn;\npid /run/nginx.pid;\n\nevents {\n  worker_connections 1024;\n}\n\nhttp {\n  include       /etc/nginx/mime.types;\n  default_type  application/octet-stream;\n  access_log  /var/log/nginx/access.log  combined;\n  sendfile        on;\n  keepalive_timeout  65;\n  include /etc/nginx/conf.d/*.conf;\n}\nEOF"
+RUN sh -lc "cat > /etc/nginx/nginx.conf << 'EOF'
+user www-data;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /run/nginx.pid;
+
+events {
+  worker_connections 1024;
+}
+
+http {
+  include       /etc/nginx/mime.types;
+  default_type  application/octet-stream;
+  access_log  /var/log/nginx/access.log  combined;
+  sendfile        on;
+  keepalive_timeout  65;
+  include /etc/nginx/conf.d/*.conf;
+}
+EOF"
 
 # Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3001
-RUN mkdir -p /etc/nginx/conf.d && sh -lc "cat > /etc/nginx/conf.d/webtop.conf.tmpl << 'EOF'\nserver {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / {\n    proxy_pass http://127.0.0.1:3001;\n    proxy_set_header Host $host;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n  }\n}\nEOF"
+RUN mkdir -p /etc/nginx/conf.d && sh -lc "cat > /etc/nginx/conf.d/webtop.conf.tmpl << 'EOF'
+server {
+  listen ${PORT} default_server;
+  server_name _;
+  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }
+  location / {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  }
+}
+EOF"
 
 # s6 cont-init to move webtop to 3001 to avoid port conflict with nginx
-RUN sh -lc "cat > /etc/cont-init.d/10-portfix << 'EOF'\n#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    if [ -f \"$f\" ]; then\n      sed -i -e 's/:3000/:3001/g' -e 's/:\\$PORT/:3001/g' \"$f\" || true\n    fi\n  done\nfi\nEOF\nchmod +x /etc/cont-init.d/10-portfix"
+RUN sh -lc "cat > /etc/cont-init.d/10-portfix << 'EOF'
+#!/usr/bin/with-contenv sh
+if [ -d /etc/services.d ]; then
+  for f in /etc/services.d/*/run; do
+    if [ -f \"$f\" ]; then
+      sed -i -e 's/:3000/:3001/g' -e 's/:\\$PORT/:3001/g' \"$f\" || true
+    fi
+  done
+fi
+EOF
+chmod +x /etc/cont-init.d/10-portfix"
 
 # s6 (v3-compatible) service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/user/contents.d
 RUN sh -lc "printf 'longrun\n' > /etc/s6-overlay/s6-rc.d/nginx/type"
-RUN sh -lc "cat > /etc/s6-overlay/s6-rc.d/nginx/run << 'EOF'\n#!/usr/bin/with-contenv sh\n# Use PORT provided by the platform at runtime, default to 3000 if unset\n: \"${PORT:=3000}\"\n# Ensure nginx runtime dir exists and disable default site that may bind to :80\nmkdir -p /run/nginx || true\nrm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default 2>/dev/null || true\n# Only substitute PORT to preserve nginx variables like $host\n/usr/bin/envsubst '\$PORT' < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\nEOF\nchmod +x /etc/s6-overlay/s6-rc.d/nginx/run && touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx"
+RUN sh -lc "cat > /etc/s6-overlay/s6-rc.d/nginx/run << 'EOF'
+#!/usr/bin/with-contenv sh
+# Use PORT provided by the platform at runtime, default to 3000 if unset
+: \"${PORT:=3000}\"
+# Ensure nginx runtime dir exists and disable default site that may bind to :80
+mkdir -p /run/nginx || true
+rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default 2>/dev/null || true
+# Only substitute PORT to preserve nginx variables like $host
+/usr/bin/envsubst '\$PORT' < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf
+exec /usr/sbin/nginx -g 'daemon off;'
+EOF
+chmod +x /etc/s6-overlay/s6-rc.d/nginx/run && touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx"
 
 EXPOSE 3000
 
