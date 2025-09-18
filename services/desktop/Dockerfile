@@ -19,15 +19,14 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
   && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y code || true
 
 # Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3001
-RUN mkdir -p /etc/nginx/conf.d && \
-    printf "server {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3001; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf.tmpl
+RUN mkdir -p /etc/nginx/conf.d && sh -lc "cat > /etc/nginx/conf.d/webtop.conf.tmpl << 'EOF'\nserver {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / {\n    proxy_pass http://127.0.0.1:3001;\n    proxy_set_header Host $host;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n  }\n}\nEOF"
 
 # s6 cont-init to move webtop to 3001 to avoid port conflict with nginx
-RUN printf "#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    if [ -f \"$f\" ]; then\n      sed -i -e 's/:3000/:3001/g' -e 's/:\\$PORT/:3001/g' \"$f\" || true;\n    fi\n  done\nfi\n" > /etc/cont-init.d/10-portfix && chmod +x /etc/cont-init.d/10-portfix
+RUN sh -lc "cat > /etc/cont-init.d/10-portfix << 'EOF'\n#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    if [ -f \"$f\" ]; then\n      sed -i -e 's/:3000/:3001/g' -e 's/:\\$PORT/:3001/g' \"$f\" || true\n    fi\n  done\nfi\nEOF\nchmod +x /etc/cont-init.d/10-portfix"
 
 # s6 service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/services.d/nginx
-RUN printf "#!/usr/bin/with-contenv sh\nexport PORT=\"${PORT:-3000}\"\n/usr/bin/envsubst < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\n" > /etc/services.d/nginx/run && chmod +x /etc/services.d/nginx/run
+RUN sh -lc "cat > /etc/services.d/nginx/run << 'EOF'\n#!/usr/bin/with-contenv sh\n# Use PORT provided by the platform at runtime, default to 3000 if unset\n: \"${PORT:=3000}\"\n# Only substitute PORT to preserve nginx variables like $host\n/usr/bin/envsubst '\$PORT' < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\nEOF\nchmod +x /etc/services.d/nginx/run"
 
 EXPOSE 3000
 
