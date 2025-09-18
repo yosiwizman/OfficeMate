@@ -41,8 +41,8 @@ npm run dev
 ## Deploy via Railway CLI
 
 ```bash
-# login (operator pastes token)
-railway login --token {{RAILWAY_TOKEN}}
+# login (headless: copy the code into the browser once prompted)
+railway login --browserless
 # link to project
 railway link --project fe6153db-0ea2-48da-a0c3-08de4ef33abc
 
