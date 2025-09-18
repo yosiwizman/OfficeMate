@@ -23,7 +23,7 @@ RUN mkdir -p /etc/nginx/conf.d && \
     printf "server {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3001; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf.tmpl
 
 # s6 cont-init to move webtop to 3001 to avoid port conflict with nginx
-RUN printf "#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    [ -f \"$f\" ] && sed -i 's/:3000/:3001/g' \"$f\" || true;\n  done\nfi\n" > /etc/cont-init.d/10-portfix && chmod +x /etc/cont-init.d/10-portfix
+RUN printf "#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    if [ -f \"$f\" ]; then\n      sed -i -e 's/:3000/:3001/g' -e 's/:\\$PORT/:3001/g' \"$f\" || true;\n    fi\n  done\nfi\n" > /etc/cont-init.d/10-portfix && chmod +x /etc/cont-init.d/10-portfix
 
 # s6 service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/services.d/nginx
