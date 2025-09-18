@@ -18,9 +18,12 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
   && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ms_vscode_keyring.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list \
   && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y code || true
 
-# Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3000
+# Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3001
 RUN mkdir -p /etc/nginx/conf.d && \
-    printf "server {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf.tmpl
+    printf "server {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3001; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf.tmpl
+
+# s6 cont-init to move webtop to 3001 to avoid port conflict with nginx
+RUN printf "#!/usr/bin/with-contenv sh\nif [ -d /etc/services.d ]; then\n  for f in /etc/services.d/*/run; do\n    [ -f \"$f\" ] && sed -i 's/:3000/:3001/g' \"$f\" || true;\n  done\nfi\n" > /etc/cont-init.d/10-portfix && chmod +x /etc/cont-init.d/10-portfix
 
 # s6 service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/services.d/nginx
