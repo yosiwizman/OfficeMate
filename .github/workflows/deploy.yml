@@ -26,21 +26,22 @@ jobs:
       - name: Install Railway CLI
         run: npm i -g @railway/cli
 
-      - name: Link Railway project
+      - name: Authenticate and link Railway project
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
+          railway whoami || true
           railway link --project $RAILWAY_PROJECT_ID
-
-      - name: Deploy UI service (root)
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up --detach --verbose
 
       - name: Deploy Desktop service
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          cd services/desktop
-          railway up --detach --verbose
+          railway up --service desktop --path-as-root services/desktop --detach --verbose
+
+      - name: Deploy UI service (root)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up --service ui --detach --verbose

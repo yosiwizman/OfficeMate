@@ -33,6 +33,8 @@ jobs:
         run: npm run build
 
       - name: Start server
+        env:
+          NEXT_PUBLIC_DESKTOP_URL: "http://localhost:3080"
         run: |
           nohup npm start &
           echo $! > server.pid

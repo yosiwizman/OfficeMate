@@ -8,7 +8,7 @@ Production-ready deployment on Railway.
 
 ## Services
 - UI (this repo root, Next.js)
-- Desktop (services/desktop based on linuxserver/webtop)
+- Desktop (services/desktop based on linuxserver/webtop) — includes LibreOffice, Firefox/Brave, VS Code (best effort), qpdf, ghostscript, p7zip-full, tesseract-ocr, gnome-screenshot. Exposes /healthz (200) for Railway health.
 
 ## Environment variables (UI)
 Set these in Railway UI service (no secrets committed):
@@ -41,6 +41,10 @@ npm run dev
 ```
 
 ## How to deploy (buttons or CLI)
+
+Troubleshooting:
+- If Desktop deploy healthcheck fails with 401, ensure /healthz is public (the image now serves it via nginx), domains exist, and Desktop service PORT=3000.
+- First run: Desktop may prompt for a password in the iframe; use the PASSWORD env you set.
 
 - One-click deploys:
   - UI (root): https://railway.app/template/new?templateUrl=https%3A%2F%2Fgithub.com%2Fyosiwizman%2FOfficeMate
