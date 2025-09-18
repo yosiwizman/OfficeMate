@@ -26,7 +26,7 @@ RUN sh -lc "cat > /etc/cont-init.d/10-portfix << 'EOF'\n#!/usr/bin/with-contenv 
 
 # s6 service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/services.d/nginx
-RUN sh -lc "cat > /etc/services.d/nginx/run << 'EOF'\n#!/usr/bin/with-contenv sh\n# Use PORT provided by the platform at runtime, default to 3000 if unset\n: \"${PORT:=3000}\"\n# Only substitute PORT to preserve nginx variables like $host\n/usr/bin/envsubst '\$PORT' < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\nEOF\nchmod +x /etc/services.d/nginx/run"
+RUN sh -lc "cat > /etc/services.d/nginx/run << 'EOF'\n#!/usr/bin/with-contenv sh\n# Use PORT provided by the platform at runtime, default to 3000 if unset\n: \"${PORT:=3000}\"\n# Ensure nginx runtime dir exists and disable default site that may bind to :80\nmkdir -p /run/nginx || true\nrm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default 2>/dev/null || true\n# Only substitute PORT to preserve nginx variables like $host\n/usr/bin/envsubst '\$PORT' < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\nEOF\nchmod +x /etc/services.d/nginx/run"
 
 EXPOSE 3000
 
