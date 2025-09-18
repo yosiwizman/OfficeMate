@@ -1,0 +1,15 @@
+services:
+  ui:
+    build:
+      context: .
+    restart: always
+    env_file: .env
+    ports:
+      - "3000:3000"
+  desktop:
+    build:
+      context: ./services/desktop
+    restart: always
+    env_file: ./services/desktop/.env
+    ports:
+      - "3080:3000"

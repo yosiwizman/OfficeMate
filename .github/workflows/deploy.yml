@@ -1,0 +1,41 @@
+name: Deploy (Railway)
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment name"
+        required: false
+        default: "production"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Link Railway project
+        run: |
+          railway login --token "$RAILWAY_TOKEN"
+          railway link --project $RAILWAY_PROJECT_ID
+
+      - name: Deploy UI service (root)
+        run: |
+          railway up --service "UI" --detach --verbose || railway up --detach --verbose
+
+      - name: Deploy Desktop service
+        run: |
+          cd services/desktop
+          railway up --service "Desktop" --detach --verbose || railway up --detach --verbose

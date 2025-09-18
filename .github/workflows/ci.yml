@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [ office-landing-and-ci ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Start server
+        run: |
+          nohup npm start &
+          echo $! > server.pid
+          sleep 5
+
+      - name: Smoke test health
+        run: |
+          curl -fsSL http://localhost:3000/api/health | grep '"ok":true'
+
+      - name: Smoke test desktop route
+        run: |
+          curl -fsSLo /tmp/desktop.html http://localhost:3000/desktop
+          test -s /tmp/desktop.html
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill $(cat server.pid) || true
