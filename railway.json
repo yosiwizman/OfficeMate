@@ -1,6 +1,7 @@
 {
   "build": {
-    "builder": "RAILPACK"
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
   },
   "deploy": {
     "healthcheckPath": "/api/health",
