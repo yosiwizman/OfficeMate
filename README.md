@@ -2,7 +2,9 @@
 
 Production-ready deployment on Railway.
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/yosiwizman/OfficeMate&plugins=postgresql)
+[![Deploy UI on Railway](https://railway.app/button.svg)](https://railway.app/template/new?templateUrl=https%3A%2F%2Fgithub.com%2Fyosiwizman%2FOfficeMate)
+
+[![Deploy Desktop on Railway](https://railway.app/button.svg)](https://railway.app/template/new?templateUrl=https%3A%2F%2Fgithub.com%2Fyosiwizman%2FOfficeMate&rootDir=services%2Fdesktop)
 
 ## Services
 - UI (this repo root, Next.js)
@@ -38,13 +40,19 @@ npm i
 npm run dev
 ```
 
+## How to deploy (buttons or CLI)
+
+- One-click deploys:
+  - UI (root): https://railway.app/template/new?templateUrl=https%3A%2F%2Fgithub.com%2Fyosiwizman%2FOfficeMate
+  - Desktop (services/desktop): https://railway.app/template/new?templateUrl=https%3A%2F%2Fgithub.com%2Fyosiwizman%2FOfficeMate&rootDir=services%2Fdesktop
+
 ## Deploy via Railway CLI
 
 ```bash
 # login (headless: copy the code into the browser once prompted)
 railway login --browserless
 # link to project
-railway link --project fe6153db-0ea2-48da-a0c3-08de4ef33abc
+railway link --project 22dac265-ded4-4ece-9d74-66e847077195
 
 # create UI variables (placeholders)
 railway variables set \
@@ -61,10 +69,12 @@ railway up --service "UI" --detach --verbose
 
 # create Desktop service env
 cd services/desktop
-railway variables set PORT=3000 TZ=UTC PUID=1000 PGID=1000 PASSWORD=change-me
+railway variables set PORT=3000 TZ=UTC PUID=1000 PGID=1000 PASSWORD=ChangeMe-Strong!
 
 # deploy Desktop
 railway up --service "Desktop" --detach --verbose
 ```
+
+First run: Desktop may prompt for a password in the iframe; use the PASSWORD env you set.
 
 After Desktop deploy, copy its public URL and paste into the UI service variable NEXT_PUBLIC_DESKTOP_URL.

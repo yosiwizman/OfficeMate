@@ -20,7 +20,8 @@ jobs:
           cache: 'npm'
 
       - name: Install deps
-        run: npm ci --no-audit --no-fund
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm i; fi
 
       - name: Typecheck
         run: npm run typecheck
