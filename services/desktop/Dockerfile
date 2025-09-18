@@ -18,6 +18,9 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
   && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ms_vscode_keyring.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list \
   && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y code || true
 
+# Nginx base config to include our conf.d files
+RUN sh -lc "cat > /etc/nginx/nginx.conf << 'EOF'\nuser www-data;\nworker_processes auto;\nerror_log /var/log/nginx/error.log warn;\npid /run/nginx.pid;\n\nevents {\n  worker_connections 1024;\n}\n\nhttp {\n  include       /etc/nginx/mime.types;\n  default_type  application/octet-stream;\n  access_log  /var/log/nginx/access.log  combined;\n  sendfile        on;\n  keepalive_timeout  65;\n  include /etc/nginx/conf.d/*.conf;\n}\nEOF"
+
 # Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3001
 RUN mkdir -p /etc/nginx/conf.d && sh -lc "cat > /etc/nginx/conf.d/webtop.conf.tmpl << 'EOF'\nserver {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / {\n    proxy_pass http://127.0.0.1:3001;\n    proxy_set_header Host $host;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n  }\n}\nEOF"
 
