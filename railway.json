@@ -1,0 +1,9 @@
+{
+  "build": {
+    "builder": "RAILPACK"
+  },
+  "deploy": {
+    "healthcheckPath": "/api/health",
+    "numReplicas": 1
+  }
+}
