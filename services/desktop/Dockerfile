@@ -5,7 +5,7 @@ USER root
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libreoffice \
     qpdf ghostscript p7zip-full tesseract-ocr gnome-screenshot \
-    nginx-light \
+    nginx-light gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Optional: install Brave browser (best effort)
@@ -20,13 +20,12 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
 
 # Nginx site to serve /healthz (200) and proxy everything else to Webtop on 3000
 RUN mkdir -p /etc/nginx/conf.d && \
-    printf "server {\n  listen 80 default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf
+    printf "server {\n  listen ${PORT} default_server;\n  server_name _;\n  location = /healthz { return 200 'OK'; add_header Content-Type text/plain; }\n  location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; }\n}\n" > /etc/nginx/conf.d/webtop.conf.tmpl
 
-# s6 service to run nginx in foreground
+# s6 service to render nginx conf with $PORT and run in foreground
 RUN mkdir -p /etc/services.d/nginx
-RUN printf "#!/usr/bin/with-contenv sh\nexec /usr/sbin/nginx -g 'daemon off;'\n" > /etc/services.d/nginx/run && chmod +x /etc/services.d/nginx/run
+RUN printf "#!/usr/bin/with-contenv sh\nexport PORT=\"${PORT:-3000}\"\n/usr/bin/envsubst < /etc/nginx/conf.d/webtop.conf.tmpl > /etc/nginx/conf.d/webtop.conf\nexec /usr/sbin/nginx -g 'daemon off;'\n" > /etc/services.d/nginx/run && chmod +x /etc/services.d/nginx/run
 
-# Expose nginx port 80 (Railway will route to this)
-EXPOSE 80
+EXPOSE 3000
 
 # Webtop uses s6 overlay entrypoint; no CMD override
