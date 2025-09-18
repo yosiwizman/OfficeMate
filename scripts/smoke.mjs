@@ -22,6 +22,21 @@ const main = async () => {
     console.error('Health check failed:', health.status, health.body)
     process.exit(1)
   }
+
+  const home = await get('/')
+  if (!home.body || home.status !== 200) {
+    console.error('Home failed:', home.status)
+    process.exit(1)
+  }
+
+  const expectedIframe = process.env.NEXT_PUBLIC_DESKTOP_URL
+  if (expectedIframe) {
+    if (!home.body.includes('<iframe') || !home.body.includes(expectedIframe)) {
+      console.error('Workspace iframe missing or URL mismatch')
+      process.exit(1)
+    }
+  }
+
   const desk = await get('/desktop')
   if (!desk.body || desk.status !== 200) {
     console.error('Desktop route failed:', desk.status)
