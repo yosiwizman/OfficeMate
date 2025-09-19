@@ -1,13 +1,15 @@
 #!/usr/bin/with-contenv sh
-set -e
+set -eu
 
-: "${PORT:=3000}"
+# Determine the external port for nginx without leaking $PORT to the base image.
+# Priority: NGINX_PORT (set by cont-init) > PORT (if not unset) > 3000
+NGINX_PORT="${NGINX_PORT:-${PORT:-3000}}"
 
 # Ensure nginx runtime dir exists and disable default site that may bind to :80
 mkdir -p /run/nginx || true
 rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default 2>/dev/null || true
 
-# Render nginx.conf from template with only $PORT substituted
-/usr/bin/envsubst '$PORT' < /etc/nginx/nginx.conf.tmpl > /etc/nginx/nginx.conf
+# Render nginx.conf from template with only PORT substituted (scoped env for envsubst)
+PORT="$NGINX_PORT" /usr/bin/envsubst '$PORT' < /etc/nginx/nginx.conf.tmpl > /etc/nginx/nginx.conf
 
 exec /usr/sbin/nginx -g 'daemon off;'

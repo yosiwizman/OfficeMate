@@ -1,10 +1,38 @@
 #!/usr/bin/with-contenv sh
-# Move any webtop service listeners from 3000/$PORT to 3001 so nginx can bind $PORT
-set -e
+# Ensure Webtop listens on 3001 so nginx can bind a dynamic external port without collision.
+# Also isolate the external port from the base image by moving $PORT -> $NGINX_PORT and unsetting $PORT.
+set -eu
+
+TARGET_PORT="${CUSTOM_PORT:-3001}"
+
+# If an external PORT is provided (Railway/local), stash it for nginx and remove it from env
+# so the base webtop does not try to bind it.
+if [ "${PORT:-}" != "" ]; then
+  echo "[10-portfix] Capturing external PORT=${PORT} for nginx and unsetting it for webtop"
+  export NGINX_PORT="${PORT}"
+  unset PORT
+fi
+
+echo "[10-portfix] Setting internal Webtop port to ${TARGET_PORT}"
+
+# Update any s6 service run scripts that hardcode 3000 or $PORT
 if [ -d /etc/services.d ]; then
   for f in /etc/services.d/*/run; do
-    if [ -f "$f" ]; then
-      sed -i -e 's/:3000/:3001/g' -e 's/:\$PORT/:3001/g' "$f" || true
-    fi
+    [ -f "$f" ] || continue
+    sed -i -e "s/:3000/:${TARGET_PORT}/g" -e "s/:\$PORT/:${TARGET_PORT}/g" "$f" || true
   done
 fi
+
+# Update Caddyfile if used by LinuxServer Webtop
+for CADDY in /etc/caddy/Caddyfile /config/Caddyfile; do
+  if [ -f "$CADDY" ]; then
+    # Replace :3000 variants with :TARGET_PORT
+    sed -i -E "s#(^|\s)(http://)?(:|0\.0\.0\.0:)3000(\s|/|$)#\1\3${TARGET_PORT}\4#g" "$CADDY" || true
+    # Handle bare ':3000' at starts or elsewhere
+    sed -i -E "s#(^|\s):3000(\s|/|$)#\1:${TARGET_PORT}\2#g" "$CADDY" || true
+    echo "[10-portfix] Updated ${CADDY} to listen on ${TARGET_PORT}"
+  fi
+done
+
+# Export CUSTOM_PORT for processes that honor it
+export CUSTOM_PORT="${TARGET_PORT}"
