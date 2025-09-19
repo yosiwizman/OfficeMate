@@ -8,6 +8,34 @@ server {
     add_header Content-Type text/plain;
   }
 
+  # Basic favicon handler to avoid noisy 502s when the upstream lacks an icon
+  location = /favicon.ico {
+    return 204;
+  }
+
+  # WebSocket routes (plural and singular) -> internal WS server on :8082
+  location = /websockets {
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_http_version 1.1;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_connect_timeout 60s;
+    proxy_buffering off;
+    proxy_pass http://127.0.0.1:8082;
+  }
+
+  location = /websocket {
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_http_version 1.1;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
+    proxy_connect_timeout 60s;
+    proxy_buffering off;
+    proxy_pass http://127.0.0.1:8082;
+  }
+
   # Proxy everything else to the internal Webtop site on :3000
   location / {
     proxy_pass http://127.0.0.1:3000;
