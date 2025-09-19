@@ -31,7 +31,10 @@ COPY nginx/conf.d/ /etc/nginx/conf.d/
 # s6 (v3) nginx service (longrun)
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d /etc/s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/nginx/dependencies.d
 COPY s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/nginx
-RUN chmod +x /etc/s6-overlay/s6-rc.d/nginx/run
+# Normalize line endings to LF to satisfy s6-rc and shell
+RUN sed -i 's/\r$//' /etc/s6-overlay/s6-rc.d/nginx/type /etc/s6-overlay/s6-rc.d/nginx/run \
+    && sed -i 's/\r$//' /etc/nginx/nginx.conf.tmpl /etc/nginx/conf.d/healthz.conf /etc/nginx/conf.d/proxy.conf \
+    && chmod +x /etc/s6-overlay/s6-rc.d/nginx/run
 RUN touch /etc/s6-overlay/s6-rc.d/nginx/dependencies.d/base
 RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx
 
