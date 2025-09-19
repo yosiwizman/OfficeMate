@@ -31,6 +31,14 @@ After auth, the home page (/) embeds the Desktop immediately. If NEXT_PUBLIC_DES
 ## Health
 /api/health returns { ok: true } for Railway health checks.
 
+### Desktop healthcheck & embedding
+- Desktop runs an nginx front inside the container (listening on $PORT from Railway) which:
+  - serves /healthz → 200 OK (no auth)
+  - reverse-proxies everything else to Webtop on port 3001
+  - preserves the Authorization header when proxying
+- Webtop’s PASSWORD auth remains enforced on proxied desktop routes; /healthz stays public.
+- Set NEXT_PUBLIC_DESKTOP_URL on the UI service to the Desktop public URL (no trailing slash).
+
 ## Local development
 
 ```bash
