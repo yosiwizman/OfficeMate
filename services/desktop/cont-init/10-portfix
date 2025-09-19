@@ -17,9 +17,19 @@ if [ ! -f /run/s6/container_environment/NGINX_PORT ]; then
   printf "%s" "3000" > /run/s6/container_environment/NGINX_PORT
 fi
 
-# Render front server from template
+# Configure internal LinuxServer default site to avoid port clashes with the front server
+# Move internal site off 3000/3001 unless the user has explicitly overridden
+if [ ! -f /run/s6/container_environment/CUSTOM_PORT ]; then
+  printf "%s" "3002" > /run/s6/container_environment/CUSTOM_PORT
+fi
+if [ ! -f /run/s6/container_environment/CUSTOM_HTTPS_PORT ]; then
+  printf "%s" "3003" > /run/s6/container_environment/CUSTOM_HTTPS_PORT
+fi
+
+# Render front server from template, proxying to the internal HTTP port
 export NGINX_PORT=$(cat /run/s6/container_environment/NGINX_PORT)
-/usr/bin/envsubst '$NGINX_PORT' < /etc/nginx/conf.d/front.conf.tmpl > /etc/nginx/conf.d/front.conf
+export UPSTREAM_HTTP_PORT=$(cat /run/s6/container_environment/CUSTOM_PORT)
+/usr/bin/envsubst '$NGINX_PORT $UPSTREAM_HTTP_PORT' < /etc/nginx/conf.d/front.conf.tmpl > /etc/nginx/conf.d/front.conf
 
 # Ensure nginx runtime dir exists
 mkdir -p /run/nginx || true

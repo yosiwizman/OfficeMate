@@ -37,9 +37,9 @@ server {
     proxy_pass http://127.0.0.1:8082;
   }
 
-  # Proxy everything else to the internal Webtop site on :3000
+  # Proxy everything else to the internal Webtop site on the configured port
   location / {
-    proxy_pass http://127.0.0.1:3000;
+    proxy_pass http://127.0.0.1:${UPSTREAM_HTTP_PORT};
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
