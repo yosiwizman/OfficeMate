@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv sh
+# Move any webtop service listeners from 3000/$PORT to 3001 so nginx can bind $PORT
+set -e
+if [ -d /etc/services.d ]; then
+  for f in /etc/services.d/*/run; do
+    if [ -f "$f" ]; then
+      sed -i -e 's/:3000/:3001/g' -e 's/:\$PORT/:3001/g' "$f" || true
+    fi
+  done
+fi

@@ -24,6 +24,9 @@ ENV CUSTOM_PORT=3001
 # Nginx base config template (rendered at runtime with $PORT)
 COPY nginx/nginx.conf.tmpl /etc/nginx/nginx.conf.tmpl
 
+# cont-init script to move internal listeners to 3001 before services start
+COPY cont-init/10-portfix /etc/cont-init.d/10-portfix
+
 # Nginx per-route config fragments
 COPY nginx/conf.d/ /etc/nginx/conf.d/
 
@@ -34,7 +37,8 @@ COPY s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/nginx
 # Normalize line endings to LF to satisfy s6-rc and shell
 RUN sed -i 's/\r$//' /etc/s6-overlay/s6-rc.d/nginx/type /etc/s6-overlay/s6-rc.d/nginx/run \
     && sed -i 's/\r$//' /etc/nginx/nginx.conf.tmpl /etc/nginx/conf.d/healthz.conf /etc/nginx/conf.d/proxy.conf \
-    && chmod +x /etc/s6-overlay/s6-rc.d/nginx/run
+    && sed -i 's/\r$//' /etc/cont-init.d/10-portfix \
+    && chmod +x /etc/s6-overlay/s6-rc.d/nginx/run /etc/cont-init.d/10-portfix
 RUN touch /etc/s6-overlay/s6-rc.d/nginx/dependencies.d/base
 RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx
 
