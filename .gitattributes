@@ -1,0 +1,5 @@
+* text=auto
+
+# Force LF endings for shell/config files consumed by s6/nginx at runtime
+services/desktop/s6-overlay/** text eol=lf
+services/desktop/nginx/** text eol=lf

@@ -1,0 +1,25 @@
+#!/usr/bin/with-contenv sh
+# Prepare nginx to expose Webtop on a dynamic external port without collisions.
+# Strategy: keep Webtop's internal nginx on its default port (3000), and add a front
+# server listening on $NGINX_PORT that proxies to 127.0.0.1:3000. Also create /healthz.
+set -eu
+
+# Capture any external PORT injected by the platform and persist it for services
+if [ -n "${PORT:-}" ]; then
+  echo "[10-portfix] Using external PORT=${PORT} for front nginx"
+  printf "%s" "${PORT}" > /run/s6/container_environment/NGINX_PORT
+  # Do not let the base image use $PORT directly
+  printf "" > /run/s6/container_environment/PORT || true
+fi
+
+# Default front port if none provided
+if [ ! -f /run/s6/container_environment/NGINX_PORT ]; then
+  printf "%s" "3000" > /run/s6/container_environment/NGINX_PORT
+fi
+
+# Render front server from template
+export NGINX_PORT=$(cat /run/s6/container_environment/NGINX_PORT)
+/usr/bin/envsubst '$NGINX_PORT' < /etc/nginx/conf.d/front.conf.tmpl > /etc/nginx/conf.d/front.conf
+
+# Ensure nginx runtime dir exists
+mkdir -p /run/nginx || true
