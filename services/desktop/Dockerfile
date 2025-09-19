@@ -18,28 +18,15 @@ RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor
   && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ms_vscode_keyring.gpg] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list \
   && apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y code || true
 
-# Ensure Webtop binds internally on 3001
-ENV CUSTOM_PORT=3001
-
-# Nginx base config template (rendered at runtime with $PORT)
-COPY nginx/nginx.conf.tmpl /etc/nginx/nginx.conf.tmpl
-
-# cont-init script to move internal listeners to 3001 before services start
+# cont-init script to prepare nginx front and env
 COPY cont-init/10-portfix /etc/cont-init.d/10-portfix
 
-# Nginx per-route config fragments
-COPY nginx/conf.d/ /etc/nginx/conf.d/
+# Nginx front template (rendered at runtime with $NGINX_PORT)
+COPY nginx/conf.d/front.conf.tmpl /etc/nginx/conf.d/front.conf.tmpl
 
-
-# s6 (v3) nginx service (longrun)
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d /etc/s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/nginx/dependencies.d
-COPY s6-overlay/s6-rc.d/nginx /etc/s6-overlay/s6-rc.d/nginx
 # Normalize line endings to LF to satisfy s6-rc and shell
-RUN sed -i 's/\r$//' /etc/s6-overlay/s6-rc.d/nginx/type /etc/s6-overlay/s6-rc.d/nginx/run \
-    && sed -i 's/\r$//' /etc/nginx/nginx.conf.tmpl /etc/nginx/conf.d/healthz.conf /etc/nginx/conf.d/proxy.conf \
+RUN sed -i 's/\r$//' /etc/nginx/conf.d/front.conf.tmpl \
     && sed -i 's/\r$//' /etc/cont-init.d/10-portfix \
-    && chmod +x /etc/s6-overlay/s6-rc.d/nginx/run /etc/cont-init.d/10-portfix
-RUN touch /etc/s6-overlay/s6-rc.d/nginx/dependencies.d/base
-RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx
+    && chmod +x /etc/cont-init.d/10-portfix
 
 # Webtop uses s6 overlay entrypoint; no CMD override

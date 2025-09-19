@@ -1,38 +1,25 @@
 #!/usr/bin/with-contenv sh
-# Ensure Webtop listens on 3001 so nginx can bind a dynamic external port without collision.
-# Also isolate the external port from the base image by moving $PORT -> $NGINX_PORT and unsetting $PORT.
+# Prepare nginx to expose Webtop on a dynamic external port without collisions.
+# Strategy: keep Webtop's internal nginx on its default port (3000), and add a front
+# server listening on $NGINX_PORT that proxies to 127.0.0.1:3000. Also create /healthz.
 set -eu
 
-TARGET_PORT="${CUSTOM_PORT:-3001}"
-
-# If an external PORT is provided (Railway/local), stash it for nginx and remove it from env
-# so the base webtop does not try to bind it.
-if [ "${PORT:-}" != "" ]; then
-  echo "[10-portfix] Capturing external PORT=${PORT} for nginx and unsetting it for webtop"
-  export NGINX_PORT="${PORT}"
-  unset PORT
+# Capture any external PORT injected by the platform and persist it for services
+if [ -n "${PORT:-}" ]; then
+  echo "[10-portfix] Using external PORT=${PORT} for front nginx"
+  printf "%s" "${PORT}" > /run/s6/container_environment/NGINX_PORT
+  # Do not let the base image use $PORT directly
+  printf "" > /run/s6/container_environment/PORT || true
 fi
 
-echo "[10-portfix] Setting internal Webtop port to ${TARGET_PORT}"
-
-# Update any s6 service run scripts that hardcode 3000 or $PORT
-if [ -d /etc/services.d ]; then
-  for f in /etc/services.d/*/run; do
-    [ -f "$f" ] || continue
-    sed -i -e "s/:3000/:${TARGET_PORT}/g" -e "s/:\$PORT/:${TARGET_PORT}/g" "$f" || true
-  done
+# Default front port if none provided
+if [ ! -f /run/s6/container_environment/NGINX_PORT ]; then
+  printf "%s" "3000" > /run/s6/container_environment/NGINX_PORT
 fi
 
-# Update Caddyfile if used by LinuxServer Webtop
-for CADDY in /etc/caddy/Caddyfile /config/Caddyfile; do
-  if [ -f "$CADDY" ]; then
-    # Replace :3000 variants with :TARGET_PORT
-    sed -i -E "s#(^|\s)(http://)?(:|0\.0\.0\.0:)3000(\s|/|$)#\1\3${TARGET_PORT}\4#g" "$CADDY" || true
-    # Handle bare ':3000' at starts or elsewhere
-    sed -i -E "s#(^|\s):3000(\s|/|$)#\1:${TARGET_PORT}\2#g" "$CADDY" || true
-    echo "[10-portfix] Updated ${CADDY} to listen on ${TARGET_PORT}"
-  fi
-done
+# Render front server from template
+export NGINX_PORT=$(cat /run/s6/container_environment/NGINX_PORT)
+/usr/bin/envsubst '$NGINX_PORT' < /etc/nginx/conf.d/front.conf.tmpl > /etc/nginx/conf.d/front.conf
 
-# Export CUSTOM_PORT for processes that honor it
-export CUSTOM_PORT="${TARGET_PORT}"
+# Ensure nginx runtime dir exists
+mkdir -p /run/nginx || true
